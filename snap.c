@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <sys/types.h>
 
+void cap_sel(void);
+void cap_win(void);
+void draw_rect(void);
+
 void overlay(Display *dpy, Window window,unsigned int width, unsigned int height) {
     XSetWindowAttributes overlayattr;
     overlayattr.override_redirect = true;
@@ -14,6 +18,7 @@ void overlay(Display *dpy, Window window,unsigned int width, unsigned int height
     XStoreName(dpy, overlaywin, "snap");
     XSelectInput(dpy, overlaywin, KeyPressMask | KeyReleaseMask);
     XMapWindow(dpy, overlaywin);
+    XFlush(dpy);
 
     bool quit = false;
     while(!quit) {
@@ -30,7 +35,17 @@ void overlay(Display *dpy, Window window,unsigned int width, unsigned int height
 
 }
 
-void select_scr(void);
+void cap_fullscr(Display *dpy,int scr,Window window) {
+    unsigned int width = DisplayWidth(dpy, scr);
+    unsigned int height = DisplayHeight(dpy, scr);
+
+    XImage *img = XGetImage(dpy,window, 0, 0, width, height, AllPlanes, ZPixmap);
+    if(!img) printf("XGetImage failed");
+    
+    // TODO : save or cpy the image based on the key press
+}
+
+
 
 int main() {
     Display *display = XOpenDisplay(NULL);
@@ -40,9 +55,7 @@ int main() {
     XGetWindowAttributes(display, rootWindow,&rootwinattr);
     unsigned int width = rootwinattr.width;
     unsigned int height = rootwinattr.height;
-    XImage *img = XGetImage(display, rootWindow, 0, 0, width, height, AllPlanes, ZPixmap);
     overlay(display, rootWindow, width, height);
-    XDestroyImage(img);
     XCloseDisplay(display);
     return 0;
 
