@@ -6,10 +6,14 @@
 #include <stdio.h>
 #include <sys/types.h>
 
-void overlay(Display *dpy, Window root, unsigned int width, unsigned int height) {
-    XStoreName(dpy, root, "snap");
-    XSelectInput(dpy, root, KeyPressMask | KeyReleaseMask);
-    XMapWindow(dpy, root);
+void overlay(Display *dpy, Window window,unsigned int width, unsigned int height) {
+    XSetWindowAttributes overlayattr;
+    overlayattr.override_redirect = true;
+    unsigned long valuemask = CWOverrideRedirect;
+    Window overlaywin = XCreateWindow(dpy, window, 0, 0, width, height, 0, CopyFromParent, InputOutput, CopyFromParent, valuemask, &overlayattr);
+    XStoreName(dpy, overlaywin, "snap");
+    XSelectInput(dpy, overlaywin, KeyPressMask | KeyReleaseMask);
+    XMapWindow(dpy, overlaywin);
 
     bool quit = false;
     while(!quit) {
@@ -32,13 +36,12 @@ int main() {
     Display *display = XOpenDisplay(NULL);
     if(!display) printf("XOpenDisplay failed!");
     Window rootWindow = RootWindow(display,DefaultScreen(display));
-    int screen_num = DefaultScreen(display);
-    unsigned int width = DisplayWidth(display, screen_num);
-    unsigned int height = DisplayHeight(display, screen_num);
-
+    XWindowAttributes rootwinattr;
+    XGetWindowAttributes(display, rootWindow,&rootwinattr);
+    unsigned int width = rootwinattr.width;
+    unsigned int height = rootwinattr.height;
     XImage *img = XGetImage(display, rootWindow, 0, 0, width, height, AllPlanes, ZPixmap);
-    if(!img) printf("XGetImage failed!");
-    overlay(display,rootWindow,width, height);
+    overlay(display, rootWindow, width, height);
     XDestroyImage(img);
     XCloseDisplay(display);
     return 0;
