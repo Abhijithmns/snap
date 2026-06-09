@@ -1,11 +1,13 @@
-#include <X11/X.h>
-#include <stdbool.h>
-
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <stdbool.h>
+
+#include <X11/X.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/keysym.h>
+#include <X11/cursorfont.h>
 
 Display *dpy = NULL;
 Window root = None;
@@ -84,6 +86,8 @@ void spawnoverlay(void) {
     overlayattr.override_redirect = true;
     unsigned long valuemask = CWOverrideRedirect;
     overlaywin = XCreateWindow(dpy, root, 0, 0, w, h, 0, CopyFromParent, InputOutput, CopyFromParent, valuemask, &overlayattr);
+    Cursor cur = XCreateFontCursor(dpy,XC_crosshair);
+    XDefineCursor(dpy, overlaywin, cur);
     XStoreName(dpy, overlaywin, "snap");
     XSelectInput(dpy, overlaywin, KeyPressMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
     XMapWindow(dpy, overlaywin);
