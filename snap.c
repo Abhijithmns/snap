@@ -120,6 +120,8 @@ void overlay(void) {
             unsigned int h = abs(slct.y1 -slct.y0);
 
             cap_sel(slct.x0,slct.y0,slct.x1,slct.y1);
+
+            XDestroyWindow(dpy,overlaywin);
             // quit 
             quit = true;
         }
@@ -208,6 +210,35 @@ void cap_sel(int x0,int y0, int x1, int y1) {
     }
     mkppm(img);
 
+}
+
+void cap_win(void) {
+    Window rooot; // root_return
+    Window child;
+    int rx;
+    int ry;
+    int wx;
+    int wy;
+    unsigned int wr;
+    unsigned int hr;
+    unsigned int bwr;
+    unsigned int dr;
+    unsigned int mr;
+
+    // find window under the pointer
+    XQueryPointer(dpy, root, &rooot,&child,&rx,&ry,&wx,&wy,&mr);
+    if(child == None) child = root;
+
+    XGetGeometry(dpy,child, &rooot, &rx, &ry, &wr, &hr, &bwr, &dr);
+    XTranslateCoordinates(dpy, child, root, 0, 0, &rx, &ry, &rooot);
+
+    XImage *img = XGetImage(dpy, root, rx, ry, wr, hr, AllPlanes, ZPixmap);
+     if(!img) {
+        printf("XGetImage failed\n");
+        return;
+    }
+
+    mkppm(img);
 }
 
 void snap_close(Bool ex) {
