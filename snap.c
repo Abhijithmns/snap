@@ -4,6 +4,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 
 #define MIN(x,y) (x > y ? y : x)
@@ -16,35 +17,75 @@ void draw_rect(void);
 enum mode {
     MODE_SEL,
     MODE_FULL,
-    MODE_SCR,
     MODE_WIN
+};
+
+struct selection {
+    bool active;
+
+    // start
+    int x0;
+    int y0;
+
+    //end 
+    int x1;
+    int y1;
 };
 
 
 void overlay(Display *dpy, Window window,unsigned int width, unsigned int height) {
     XSetWindowAttributes overlayattr;
+    struct selection slct = {0};
     overlayattr.override_redirect = true;
     unsigned long valuemask = CWOverrideRedirect;
     Window overlaywin = XCreateWindow(dpy, window, 0, 0, width, height, 0, CopyFromParent, InputOutput, CopyFromParent, valuemask, &overlayattr);
     XStoreName(dpy, overlaywin, "snap");
-    XSelectInput(dpy, overlaywin, KeyPressMask | KeyReleaseMask);
+    XSelectInput(dpy, overlaywin, KeyPressMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
     XMapWindow(dpy, overlaywin);
     XFlush(dpy);
 
     bool quit = false;
     while(!quit) {
-      while(XPending(dpy) > 0) {
         XEvent event = {0};
         XNextEvent(dpy,&event);
-        if(event.type == KeyPress) { 
-          quit = true;
+
+        if(event.type == ButtonPress) {
+            slct.active = true;
+            slct.x0 = event.xbutton.x_root;
+            slct.y0 = event.xbutton.y_root;
+            slct.x1 = event.xbutton.x_root;
+            slct.y1 = event.xbutton.y_root;
+
+            printf("initial coords : (%d,%d)", slct.x0,slct.y0);
+
+        }
+        if(event.type == MotionNotify) {
+            slct.active = true;
+            
+            slct.x1 = event.xmotion.x_root;
+            slct.y1 = event.xmotion.y_root;
+
+        }
+
+        if(event.type == ButtonRelease) {
+            slct.active = false;
+
+            unsigned int x = MIN(slct.x0,slct.x1);
+            unsigned int y = MIN(slct.y0,slct.y1);
+
+            unsigned int w = abs(slct.x1 - slct.x0);
+            unsigned int h = abs(slct.y1 -slct.y0);
+
+            printf("final coords : (%d,%d)\n", slct.x1,slct.y1);
+            printf("height and width : %d x %d", h, w);
+
+            // exit 
+            quit = true;
         }
       }
-      // Application work (event loop??)
-
-    }
 
 }
+
 
 
 unsigned char channel(unsigned long pxl, Mask m) {
@@ -116,7 +157,7 @@ int main() {
     XGetWindowAttributes(display, rootWindow,&rootwinattr);
     unsigned int width = rootwinattr.width;
     unsigned int height = rootwinattr.height;
-    cap_fullscr(display,DefaultScreen(display), rootWindow);
+    overlay(display, rootWindow, width,height);
     XCloseDisplay(display);
     return 0;
 
