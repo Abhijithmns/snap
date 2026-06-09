@@ -9,6 +9,8 @@
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
 
+#include "config.h"
+
 Display *dpy = NULL;
 Window root = None;
 Window overlaywin = None;
@@ -63,7 +65,7 @@ void setup(void) {
     gcv.function = GXxor;
     gcv.foreground = WhitePixel(dpy, scr) ^ BlackPixel(dpy, scr);
     gcv.line_style = LineSolid;
-    gcv.line_width = 2;
+    gcv.line_width = rect_line_width;
     gcv.subwindow_mode = IncludeInferiors;
 
     sel_gc = XCreateGC(dpy, root,GCFunction | GCForeground | GCLineStyle | GCLineWidth | GCSubwindowMode, &gcv);
@@ -86,7 +88,7 @@ void spawnoverlay(void) {
     overlayattr.override_redirect = true;
     unsigned long valuemask = CWOverrideRedirect;
     overlaywin = XCreateWindow(dpy, root, 0, 0, w, h, 0, CopyFromParent, InputOutput, CopyFromParent, valuemask, &overlayattr);
-    Cursor cur = XCreateFontCursor(dpy,XC_crosshair);
+    Cursor cur = XCreateFontCursor(dpy,cursor_font); 
     XDefineCursor(dpy, overlaywin, cur);
     XStoreName(dpy, overlaywin, "snap");
     XSelectInput(dpy, overlaywin, KeyPressMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
