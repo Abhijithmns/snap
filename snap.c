@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include <X11/X.h>
 #include <X11/Xlib.h>
@@ -30,6 +31,7 @@ void cap_fullscr(void);
 void draw_rect(int x0,int y0, int x1, int y1);
 void mkppm(XImage *img);
 void die(const char *s);
+void usage(void);
 void snap_close(Bool ex);
 
 enum mode {
@@ -64,7 +66,7 @@ void setup(void) {
     XGCValues gcv;
     gcv.function = GXxor;
     gcv.foreground = WhitePixel(dpy, scr) ^ BlackPixel(dpy, scr);
-    gcv.line_style = LineSolid;
+    gcv.line_style = rect_line_style;
     gcv.line_width = rect_line_width;
     gcv.subwindow_mode = IncludeInferiors;
 
@@ -267,6 +269,14 @@ void cap_win(void) {
     XDestroyImage(img);
 }
 
+void usage(void) {
+    puts("Usage:");
+    puts("snap -s        capture selection");
+    puts("snap -f        capture fullscreen");
+    puts("snap -w        capture window");
+    puts("snap -h        show help");
+    puts("snap --help    show help");
+}
 void snap_close(Bool ex) {
     XCloseDisplay(dpy);
     if(ex) {
@@ -276,9 +286,27 @@ void snap_close(Bool ex) {
 
 
 
-int main() {
+
+int main(int argc, char **argv) {
     setup();
-    cap_sel();
+
+    if(argc != 2) 
+        die("usage : snap [-s | -f | -w]");
+
+    if(strcmp(argv[1], "-s") == 0) 
+        cap_sel();
+    else if(!strcmp(argv[1], "-f"))
+        cap_fullscr();
+    else if(!strcmp(argv[1], "-w"))
+        cap_win();
+    else if(!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
+        usage();
+        return EXIT_SUCCESS;
+    }
+
+    else 
+        die("usage : snap [-s | -f | -w]");
+
     snap_close(True);
 
     return EXIT_SUCCESS;
