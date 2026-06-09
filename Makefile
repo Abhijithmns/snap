@@ -27,4 +27,24 @@ snap:
 clean:
 	rm -rf snap
 
-.PHONY: all clean install uninstall clangd
+install: all
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	cp -f snap $(DESTDIR)$(PREFIX)/bin
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/snap
+
+uninstall: 
+	rm -f $(DESTDIR)$(PREFIX)/bin/snap
+
+help:
+	@echo "snap - A minimal X11 screenshot utility"
+	@echo "======================================="
+	@echo ""
+	@echo "Building:"
+	@echo "  make - Compile snap"
+	@echo "  make clean - Remove build artifacts"
+	@echo "  make install - Install snap binary"
+	@echo "  make uninstall - Uninstall snap binary"
+
+
+
+.PHONY: all clean install uninstall help
