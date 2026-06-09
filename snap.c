@@ -64,7 +64,7 @@ void setup(void) {
 
 void draw_rect(int x0,int y0, int x1, int y1) {
     int rx = MIN(x0,x1);
-    int ry = MIN(x1,y1);
+    int ry = MIN(y0,y1);
     unsigned int rw = MAX(x0,x1) - rx;
     unsigned int rh = MAX(y0,y1) - ry;
 
@@ -100,13 +100,13 @@ void overlay(void) {
             printf("initial coords : (%d,%d)", slct.x0,slct.y0);
         }
         
-        if(event.type == MotionNotify) {
-            slct.active = true;
-            
+        if(event.type == MotionNotify && slct.active) {
+            draw_rect(slct.x0, slct.y0, slct.x1, slct.y1); // erase old
+
             slct.x1 = event.xmotion.x_root;
             slct.y1 = event.xmotion.y_root;
-            draw_rect(slct.x0, slct.y0, slct.x1, slct.y1);
 
+            draw_rect(slct.x0, slct.y0, slct.x1, slct.y1); // draw new
         }
         
 
