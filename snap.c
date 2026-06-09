@@ -19,8 +19,9 @@ unsigned int h = 0;
 #define MAX(x,y) (x > y ? x : y)
 
 void setup(void);
-void cap_sel(void);
 void cap_win(void);
+void cap_sel(int x0,int y0, int x1, int y1);
+void die(const char *s);
 void snap_close(Bool ex);
 
 enum mode {
@@ -97,7 +98,6 @@ void overlay(void) {
             slct.x1 = event.xbutton.x_root;
             slct.y1 = event.xbutton.y_root;
 
-            printf("initial coords : (%d,%d)", slct.x0,slct.y0);
         }
         
         if(event.type == MotionNotify && slct.active) {
@@ -119,9 +119,7 @@ void overlay(void) {
             unsigned int w = abs(slct.x1 - slct.x0);
             unsigned int h = abs(slct.y1 -slct.y0);
 
-            printf("final coords : (%d,%d)\n", slct.x1,slct.y1);
-            printf("height and width : %d x %d", h, w);
-
+            cap_sel(slct.x0,slct.y0,slct.x1,slct.y1);
             // quit 
             quit = true;
         }
@@ -177,17 +175,39 @@ void mkppm(XImage *img) {
     fflush(stdout);
 }
 
-void cap_fullscr(Display *dpy,int scr,Window window) {
+void cap_fullscr(void) {
     unsigned int width = DisplayWidth(dpy, scr);
     unsigned int height = DisplayHeight(dpy, scr);
 
-    XImage *img = XGetImage(dpy,window, 0, 0, width, height, AllPlanes, ZPixmap);
+    XImage *img = XGetImage(dpy,root, 0, 0, width, height, AllPlanes, ZPixmap);
     if(!img) {
         printf("XGetImage failed");
         return;
     }
     
     mkppm(img);
+}
+
+void die(const char *s) {
+    fprintf(stderr, "snap %s\n" , s);
+    exit(EXIT_FAILURE);
+}
+
+void cap_sel(int x0,int y0, int x1, int y1) {
+    int rx = MIN(x0,x1);
+    int ry = MIN(y0,y1);
+    int rw = MAX(x0,x1) - rx;
+    int rh = MAX(y0,y1) - ry;
+    
+    if(rw <= 0 || rh <= 0) die("empty selection");
+
+    XImage *img = XGetImage(dpy,root, rx, ry, rw, rh, AllPlanes, ZPixmap);
+    if(!img) {
+        printf("XGetImage failed\n");
+        return;
+    }
+    mkppm(img);
+
 }
 
 void snap_close(Bool ex) {
