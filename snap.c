@@ -7,12 +7,21 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
+Display *dpy = NULL;
+Window root = None;
+Window overlaywin = None;
+GC sel_gc = 0;
+int scr = -1;
+unsigned int w = 0;
+unsigned int h = 0;
+
 #define MIN(x,y) (x > y ? y : x)
 #define MAX(x,y) (x > y ? x : y)
 
+void setup(void);
 void cap_sel(void);
 void cap_win(void);
-void draw_rect(void);
+void snap_close(Bool ex);
 
 enum mode {
     MODE_SEL,
@@ -32,13 +41,45 @@ struct selection {
     int y1;
 };
 
+void setup(void) {
+    dpy = XOpenDisplay(NULL);
+    if(dpy == NULL) printf("failed to open display\n");
+    scr = DefaultScreen(dpy);
+    root = RootWindow(dpy, scr);
+    XWindowAttributes rootattr;
+    XGetWindowAttributes(dpy, root, &rootattr);
+    w = rootattr.width;
+    h = rootattr.height;
 
-void overlay(Display *dpy, Window window,unsigned int width, unsigned int height) {
+    //rectangle
+    XGCValues gcv;
+    gcv.function = GXxor;
+    gcv.foreground = WhitePixel(dpy, scr) ^ BlackPixel(dpy, scr);
+    gcv.line_style = LineSolid;
+    gcv.line_width = 2;
+    gcv.subwindow_mode = IncludeInferiors;
+
+    sel_gc = XCreateGC(dpy, root,GCFunction | GCForeground | GCLineStyle | GCLineWidth | GCSubwindowMode, &gcv);
+}
+
+void draw_rect(int x0,int y0, int x1, int y1) {
+    int rx = MIN(x0,x1);
+    int ry = MIN(x1,y1);
+    unsigned int rw = MAX(x0,x1) - rx;
+    unsigned int rh = MAX(y0,y1) - ry;
+
+    if(rw > 0 && rh > 0) {
+        XDrawRectangle(dpy, overlaywin, sel_gc, rx, ry, rw, rh);
+    }
+}
+
+
+void overlay(void) {
     XSetWindowAttributes overlayattr;
     struct selection slct = {0};
     overlayattr.override_redirect = true;
     unsigned long valuemask = CWOverrideRedirect;
-    Window overlaywin = XCreateWindow(dpy, window, 0, 0, width, height, 0, CopyFromParent, InputOutput, CopyFromParent, valuemask, &overlayattr);
+    overlaywin = XCreateWindow(dpy, root, 0, 0, w, h, 0, CopyFromParent, InputOutput, CopyFromParent, valuemask, &overlayattr);
     XStoreName(dpy, overlaywin, "snap");
     XSelectInput(dpy, overlaywin, KeyPressMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
     XMapWindow(dpy, overlaywin);
@@ -57,15 +98,17 @@ void overlay(Display *dpy, Window window,unsigned int width, unsigned int height
             slct.y1 = event.xbutton.y_root;
 
             printf("initial coords : (%d,%d)", slct.x0,slct.y0);
-
         }
+        
         if(event.type == MotionNotify) {
             slct.active = true;
             
             slct.x1 = event.xmotion.x_root;
             slct.y1 = event.xmotion.y_root;
+            draw_rect(slct.x0, slct.y0, slct.x1, slct.y1);
 
         }
+        
 
         if(event.type == ButtonRelease) {
             slct.active = false;
@@ -79,7 +122,7 @@ void overlay(Display *dpy, Window window,unsigned int width, unsigned int height
             printf("final coords : (%d,%d)\n", slct.x1,slct.y1);
             printf("height and width : %d x %d", h, w);
 
-            // exit 
+            // quit 
             quit = true;
         }
       }
@@ -147,19 +190,20 @@ void cap_fullscr(Display *dpy,int scr,Window window) {
     mkppm(img);
 }
 
+void snap_close(Bool ex) {
+    XCloseDisplay(dpy);
+    if(ex) {
+        exit(EXIT_SUCCESS);
+    }
+}
+
 
 
 int main() {
-    Display *display = XOpenDisplay(NULL);
-    if(!display) printf("XOpenDisplay failed!");
-    Window rootWindow = RootWindow(display,DefaultScreen(display));
-    XWindowAttributes rootwinattr;
-    XGetWindowAttributes(display, rootWindow,&rootwinattr);
-    unsigned int width = rootwinattr.width;
-    unsigned int height = rootwinattr.height;
-    overlay(display, rootWindow, width,height);
-    XCloseDisplay(display);
-    return 0;
+    setup();
+    overlay();
+    snap_close(True);
 
+    return EXIT_SUCCESS;
 }
 
