@@ -10,7 +10,7 @@
 Display *dpy = NULL;
 Window root = None;
 Window overlaywin = None;
-GC sel_gc = 0;
+GC sel_gc = 0; // stores all the params : width, color...
 int scr = -1;
 unsigned int w = 0;
 unsigned int h = 0;
@@ -20,7 +20,11 @@ unsigned int h = 0;
 
 void setup(void);
 void cap_win(void);
-void cap_sel(int x0,int y0, int x1, int y1);
+void cap_sel_core(int x0,int y0, int x1, int y1);
+void cap_sel(void);
+void cap_fullscr(void);
+void draw_rect(int x0,int y0, int x1, int y1);
+void mkppm(XImage *img);
 void die(const char *s);
 void snap_close(Bool ex);
 
@@ -44,7 +48,7 @@ struct selection {
 
 void setup(void) {
     dpy = XOpenDisplay(NULL);
-    if(dpy == NULL) printf("failed to open display\n");
+    if(dpy == NULL) die("failed to open display\n");
     scr = DefaultScreen(dpy);
     root = RootWindow(dpy, scr);
     XWindowAttributes rootattr;
@@ -75,9 +79,8 @@ void draw_rect(int x0,int y0, int x1, int y1) {
 }
 
 
-void overlay(void) {
+void spawnoverlay(void) {
     XSetWindowAttributes overlayattr;
-    struct selection slct = {0};
     overlayattr.override_redirect = true;
     unsigned long valuemask = CWOverrideRedirect;
     overlaywin = XCreateWindow(dpy, root, 0, 0, w, h, 0, CopyFromParent, InputOutput, CopyFromParent, valuemask, &overlayattr);
@@ -86,47 +89,8 @@ void overlay(void) {
     XMapWindow(dpy, overlaywin);
     XFlush(dpy);
 
-    bool quit = false;
-    while(!quit) {
-        XEvent event = {0};
-        XNextEvent(dpy,&event);
-
-        if(event.type == ButtonPress) {
-            slct.active = true;
-            slct.x0 = event.xbutton.x_root;
-            slct.y0 = event.xbutton.y_root;
-            slct.x1 = event.xbutton.x_root;
-            slct.y1 = event.xbutton.y_root;
-
-        }
-        
-        if(event.type == MotionNotify && slct.active) {
-            draw_rect(slct.x0, slct.y0, slct.x1, slct.y1); // erase old
-
-            slct.x1 = event.xmotion.x_root;
-            slct.y1 = event.xmotion.y_root;
-
-            draw_rect(slct.x0, slct.y0, slct.x1, slct.y1); // draw new
-        }
-        
-
-        if(event.type == ButtonRelease) {
-            slct.active = false;
-
-            unsigned int x = MIN(slct.x0,slct.x1);
-            unsigned int y = MIN(slct.y0,slct.y1);
-
-            unsigned int w = abs(slct.x1 - slct.x0);
-            unsigned int h = abs(slct.y1 -slct.y0);
-
-            cap_sel(slct.x0,slct.y0,slct.x1,slct.y1);
-
-            XDestroyWindow(dpy,overlaywin);
-            // quit 
-            quit = true;
-        }
-      }
-
+    XGrabPointer(dpy, overlaywin, False, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, overlaywin, None, CurrentTime);
+    XGrabKeyboard(dpy, overlaywin, False, GrabModeAsync, GrabModeAsync, CurrentTime);
 }
 
 
@@ -188,14 +152,67 @@ void cap_fullscr(void) {
     }
     
     mkppm(img);
+    XDestroyImage(img);
 }
 
 void die(const char *s) {
-    fprintf(stderr, "snap %s\n" , s);
+    fprintf(stderr, "snap: %s\n" , s);
     exit(EXIT_FAILURE);
 }
 
-void cap_sel(int x0,int y0, int x1, int y1) {
+void cap_sel(void) {
+    spawnoverlay();
+    struct selection sel = {0};
+    bool quit = false;
+    while(!quit) {
+        XEvent event = {0};
+        XNextEvent(dpy,&event);
+
+        if(event.type == ButtonPress) {
+            sel.active = true;
+            sel.x0 = event.xbutton.x_root;
+            sel.y0 = event.xbutton.y_root;
+            sel.x1 = event.xbutton.x_root;
+            sel.y1 = event.xbutton.y_root;
+
+        }
+        
+        if(event.type == MotionNotify && sel.active) {
+            draw_rect(sel.x0, sel.y0, sel.x1, sel.y1); // erase old
+
+            sel.x1 = event.xmotion.x_root;
+            sel.y1 = event.xmotion.y_root;
+
+            draw_rect(sel.x0, sel.y0, sel.x1, sel.y1); //draw new
+
+            XFlush(dpy);
+        }
+        
+
+        if(event.type == ButtonRelease) {
+            sel.active = false;
+            XUngrabPointer(dpy, CurrentTime);
+            XUngrabKeyboard(dpy, CurrentTime);
+            XDestroyWindow(dpy,overlaywin);
+            XSync(dpy, False);
+            cap_sel_core(sel.x0,sel.y0,sel.x1,sel.y1);
+            // exit looop 
+            quit = true;
+        }
+        if(event.type == KeyPress) {
+            KeySym key = XLookupKeysym(&event.xkey,0);
+            if(key == XK_Escape) {
+                XUngrabPointer(dpy, CurrentTime);
+                XUngrabKeyboard(dpy, CurrentTime);
+                XDestroyWindow(dpy, overlaywin);
+                snap_close(True);
+            }
+        }
+      }
+}
+
+void cap_sel_core(int x0,int y0, int x1, int y1) {
+
     int rx = MIN(x0,x1);
     int ry = MIN(y0,y1);
     int rw = MAX(x0,x1) - rx;
@@ -209,6 +226,8 @@ void cap_sel(int x0,int y0, int x1, int y1) {
         return;
     }
     mkppm(img);
+    
+    XDestroyImage(img);
 
 }
 
@@ -239,6 +258,7 @@ void cap_win(void) {
     }
 
     mkppm(img);
+    XDestroyImage(img);
 }
 
 void snap_close(Bool ex) {
@@ -252,7 +272,7 @@ void snap_close(Bool ex) {
 
 int main() {
     setup();
-    overlay();
+    cap_sel();
     snap_close(True);
 
     return EXIT_SUCCESS;
